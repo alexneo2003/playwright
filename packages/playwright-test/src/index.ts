@@ -550,6 +550,7 @@ class ArtifactsRecorder {
   async willStartTest(testInfo: TestInfoImpl) {
     this._testInfo = testInfo;
     testInfo._onDidFinishTestFunction = () => this.didFinishTestFunction();
+    testInfo._onSoftExpectFailedFunction =  () => this.onSoftExpectFailed();
     this._captureTrace = shouldCaptureTrace(this._traceMode, testInfo) && !process.env.PW_TEST_DISABLE_TRACING;
 
     // Since beforeAll(s), test and afterAll(s) reuse the same TestInfo, make sure we do not
@@ -685,6 +686,12 @@ class ArtifactsRecorder {
     }
   }
 
+  async onSoftExpectFailed() {
+    console.log('🚀 ~ this._testInfo._isFailure():', this._testInfo._isFailure());
+    if (this._testInfo._isFailure() && (this._screenshotMode === 'on' || this._screenshotMode === 'only-on-failure'))
+      await this._screenshotOnTestFailure();
+  }
+
   private _createScreenshotAttachmentPath() {
     const testFailed = this._testInfo.status !== this._testInfo.expectedStatus;
     const index = this._screenshotOrdinal + 1;
@@ -699,16 +706,19 @@ class ArtifactsRecorder {
     (page as any)[this._screenshottedSymbol] = true;
     try {
       const screenshotPath = path.join(this._artifactsDir, createGuid() + '.png');
+      console.log('🚀 ~ screenshotPath:', screenshotPath);
       // Pass caret=initial to avoid any evaluations that might slow down the screenshot
       // and let the page modify itself from the problematic state it had at the moment of failure.
       await page.screenshot({ ...this._screenshotOptions, timeout: 5000, path: screenshotPath, caret: 'initial' }).catch(() => {});
       this._temporaryScreenshots.push(screenshotPath);
+      console.log('🚀 ~ this._temporaryScreenshots:', this._temporaryScreenshots);
     } catch {
       // Screenshot may fail, just ignore.
     }
   }
 
   private async _screenshotOnTestFailure() {
+    console.log('🚀 ~ _screenshotOnTestFailure:');
     const contexts: BrowserContext[] = [];
     for (const browserType of [this._playwright.chromium, this._playwright.firefox, this._playwright.webkit])
       contexts.push(...(browserType as any)._contexts);
